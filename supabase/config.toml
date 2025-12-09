@@ -1,0 +1,7 @@
+project_id = "tvxighejqlrqhdzvgrzn"
+
+[functions.send-telegram-alert]
+verify_jwt = false
+
+[functions.predict-air-quality]
+verify_jwt = false

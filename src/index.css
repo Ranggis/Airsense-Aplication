@@ -5,81 +5,73 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap');
 
 @layer base {
+  /* Light Mode (default) */
   :root {
-    --background: 240 15% 8%;
-    --foreground: 0 0% 95%;
-    --card: 240 15% 12%;
-    --card-foreground: 0 0% 95%;
-    --popover: 240 15% 12%;
-    --popover-foreground: 0 0% 95%;
-    --primary: 162 80% 50%;
-    --primary-foreground: 240 15% 8%;
-    --secondary: 240 12% 16%;
-    --secondary-foreground: 0 0% 85%;
-    --muted: 240 12% 18%;
-    --muted-foreground: 240 5% 55%;
-    --accent: 162 40% 18%;
-    --accent-foreground: 162 80% 60%;
+    --background: 0 0% 98%;
+    --foreground: 240 10% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 10%;
+    --primary: 162 80% 40%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 5% 92%;
+    --secondary-foreground: 240 10% 20%;
+    --muted: 240 5% 95%;
+    --muted-foreground: 240 5% 45%;
+    --accent: 162 40% 92%;
+    --accent-foreground: 162 80% 30%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --border: 240 12% 20%;
-    --input: 240 12% 18%;
-    --ring: 162 80% 50%;
+    --border: 240 5% 85%;
+    --input: 240 5% 90%;
+    --ring: 162 80% 40%;
     --radius: 1rem;
-    --aq-good: 152 65% 50%;
-    --aq-moderate: 45 85% 55%;
-    --aq-unhealthy-sensitive: 25 90% 55%;
-    --aq-unhealthy: 0 70% 55%;
-    --aq-very-unhealthy: 320 65% 55%;
-    --aq-hazardous: 0 75% 45%;
-    --sidebar-background: 240 15% 10%;
-    --sidebar-foreground: 0 0% 90%;
-    --sidebar-primary: 162 80% 50%;
-    --sidebar-primary-foreground: 240 15% 8%;
-    --sidebar-accent: 162 40% 18%;
-    --sidebar-accent-foreground: 162 80% 60%;
-    --sidebar-border: 240 12% 18%;
-    --sidebar-ring: 162 80% 50%;
+    --aq-good: 152 65% 40%;
+    --aq-moderate: 45 85% 45%;
+    --aq-unhealthy-sensitive: 25 90% 45%;
+    --aq-unhealthy: 0 70% 50%;
+    --aq-very-unhealthy: 320 65% 45%;
+    --aq-hazardous: 0 75% 40%;
+    --sidebar-background: 0 0% 97%;
+    --sidebar-foreground: 240 10% 15%;
+    --sidebar-primary: 162 80% 40%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 162 40% 92%;
+    --sidebar-accent-foreground: 162 80% 30%;
+    --sidebar-border: 240 5% 85%;
+    --sidebar-ring: 162 80% 40%;
     --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
     --font-mono: 'Space Mono', monospace;
   }
 
+  /* Dark Mode */
   .dark {
     --background: 240 15% 8%;
     --foreground: 0 0% 95%;
-
     --card: 240 15% 12%;
     --card-foreground: 0 0% 95%;
-
     --popover: 240 15% 12%;
     --popover-foreground: 0 0% 95%;
-
     --primary: 162 80% 50%;
     --primary-foreground: 240 15% 8%;
-
     --secondary: 240 12% 16%;
     --secondary-foreground: 0 0% 85%;
-
     --muted: 240 12% 18%;
     --muted-foreground: 240 5% 55%;
-
     --accent: 162 40% 18%;
     --accent-foreground: 162 80% 60%;
-
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-
     --border: 240 12% 20%;
     --input: 240 12% 18%;
     --ring: 162 80% 50%;
-
     --aq-good: 152 65% 50%;
     --aq-moderate: 45 85% 55%;
     --aq-unhealthy-sensitive: 25 90% 55%;
     --aq-unhealthy: 0 70% 55%;
     --aq-very-unhealthy: 320 65% 55%;
     --aq-hazardous: 0 75% 45%;
-
     --sidebar-background: 240 15% 10%;
     --sidebar-foreground: 0 0% 90%;
     --sidebar-primary: 162 80% 50%;
@@ -96,9 +88,25 @@
     @apply border-border;
   }
 
+  /* Smooth theme transition */
+  html {
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  html:not(.dark) {
+    color-scheme: light;
+  }
+
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
     font-family: var(--font-sans);
+    @apply antialiased;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 
   h1, h2, h3, h4, h5, h6 {

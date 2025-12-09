@@ -1,52 +1,27 @@
 /**
- * Firebase Realtime Database Service
+ * Firebase Realtime Database Service for IoT Mode
  * 
  * This service handles fetching sensor data from Firebase Realtime Database.
- * 
- * TODO: Implement actual Firebase SDK integration
+ * IoT mode uses MQ-135 (gas_index), DHT22 (temp/humidity), BMP280 (pressure)
  * 
  * Expected Firebase data structure:
  * {
  *   "sensor": {
- *     "pm_sepuluh": 45,
- *     "pm_duakomalima": 25,
- *     "sulfur_dioksida": 30,
- *     "karbon_monoksida": 2.5,
- *     "ozon": 40,
- *     "nitrogen_dioksida": 35,
- *     "timestamp": 1699999999999
+ *     "gas_index": 150,      // MQ-135 sensor value
+ *     "suhu": 28.5,          // DHT22 temperature
+ *     "kelembapan": 65,      // DHT22 humidity
+ *     "tekanan": 1013.25     // BMP280 pressure
  *   }
  * }
  */
 
-import { IoTConfig, PollutantData, SensorReading } from '@/types/airQuality';
+import { IoTConfig, SensorReading, IoTSensorData } from '@/types/airQuality';
 
 /**
  * Fetch sensor data from Firebase Realtime Database
  * 
  * @param config - Firebase configuration with URL and data path
- * @returns SensorReading with pollutant data
- * 
- * TODO: Replace with actual Firebase SDK implementation:
- * 
- * ```typescript
- * import { getDatabase, ref, get } from 'firebase/database';
- * 
- * async function fetchFromFirebase(config: IoTConfig): Promise<SensorReading> {
- *   const db = getDatabase();
- *   const snapshot = await get(ref(db, config.dataPath));
- *   const data = snapshot.val();
- *   return {
- *     pollutants: {
- *       pm_sepuluh: data.pm_sepuluh,
- *       pm_duakomalima: data.pm_duakomalima,
- *       // ... etc
- *     },
- *     timestamp: new Date(data.timestamp),
- *     source: 'iot'
- *   };
- * }
- * ```
+ * @returns SensorReading with IoT sensor data (gas_index, temp, humidity, pressure)
  */
 export async function fetchFirebaseData(config: IoTConfig): Promise<SensorReading> {
   // Validate configuration
@@ -54,57 +29,63 @@ export async function fetchFirebaseData(config: IoTConfig): Promise<SensorReadin
     throw new Error('Firebase URL dan path data harus diisi');
   }
 
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
+  try {
+    // Build the Firebase REST API URL
+    const url = `${config.firebaseUrl}${config.dataPath}.json`;
+    console.log('[Firebase Service] Fetching from:', url);
 
-  // Generate realistic dummy data for IoT sensors
-  // TODO: Replace with actual Firebase REST API call or SDK
-  const dummyPollutants: PollutantData = {
-    pm_sepuluh: Math.round(20 + Math.random() * 100),
-    pm_duakomalima: Math.round(10 + Math.random() * 60),
-    sulfur_dioksida: Math.round(15 + Math.random() * 80),
-    karbon_monoksida: Math.round((1 + Math.random() * 8) * 10) / 10,
-    ozon: Math.round(20 + Math.random() * 80),
-    nitrogen_dioksida: Math.round(20 + Math.random() * 70),
-  };
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error(`Firebase error: ${response.status} ${response.statusText}`);
+    }
 
-  console.log('[Firebase Service] Fetched data from:', config.firebaseUrl + config.dataPath);
-  console.log('[Firebase Service] Data:', dummyPollutants);
+    const data = await response.json();
+    
+    if (!data) {
+      throw new Error('Data tidak ditemukan di Firebase');
+    }
 
-  return {
-    pollutants: dummyPollutants,
-    timestamp: new Date(),
-    source: 'iot'
-  };
+    // Parse IoT sensor data
+    const iotData: IoTSensorData = {
+      gas_index: parseFloat(data.gas_index) || 0,
+      suhu: data.suhu !== undefined ? parseFloat(data.suhu) : null,
+      kelembapan: data.kelembapan !== undefined ? parseFloat(data.kelembapan) : null,
+      tekanan: data.tekanan !== undefined ? parseFloat(data.tekanan) : null,
+    };
+
+    console.log('[Firebase Service] IoT Data received:', iotData);
+
+    // For IoT mode, pollutants are not used (ML not called)
+    // We still populate with nulls for interface compatibility
+    return {
+      pollutants: {
+        pm_sepuluh: null,
+        pm_duakomalima: null,
+        sulfur_dioksida: null,
+        karbon_monoksida: null,
+        ozon: null,
+        nitrogen_dioksida: null,
+      },
+      iotData,
+      weather: {
+        suhu: iotData.suhu,
+        kelembapan: iotData.kelembapan,
+        tekanan: iotData.tekanan,
+        kondisi: null,
+      },
+      timestamp: new Date(),
+      source: 'iot',
+      location: 'IoT Sensor'
+    };
+  } catch (error) {
+    console.error('[Firebase Service] Error:', error);
+    throw error;
+  }
 }
 
 /**
  * Subscribe to real-time updates from Firebase
- * 
- * TODO: Implement real-time listener
- * 
- * ```typescript
- * import { onValue, ref } from 'firebase/database';
- * 
- * function subscribeToSensorData(
- *   config: IoTConfig,
- *   callback: (data: SensorReading) => void
- * ): () => void {
- *   const db = getDatabase();
- *   const dataRef = ref(db, config.dataPath);
- *   
- *   const unsubscribe = onValue(dataRef, (snapshot) => {
- *     const data = snapshot.val();
- *     callback({
- *       pollutants: { ... },
- *       timestamp: new Date(data.timestamp),
- *       source: 'iot'
- *     });
- *   });
- *   
- *   return unsubscribe;
- * }
- * ```
  */
 export function subscribeToFirebaseData(
   config: IoTConfig,
@@ -112,10 +93,13 @@ export function subscribeToFirebaseData(
 ): () => void {
   console.log('[Firebase Service] Starting subscription to:', config.dataPath);
   
-  // Dummy implementation - simulates periodic updates
   const intervalId = setInterval(async () => {
-    const data = await fetchFirebaseData(config);
-    callback(data);
+    try {
+      const data = await fetchFirebaseData(config);
+      callback(data);
+    } catch (error) {
+      console.error('[Firebase Service] Subscription error:', error);
+    }
   }, 30000); // Update every 30 seconds
 
   return () => {

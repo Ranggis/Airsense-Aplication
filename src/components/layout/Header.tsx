@@ -1,18 +1,23 @@
 import { Wind, Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 export function Header() {
-  const [isDark, setIsDark] = useState(true);
-
-  useEffect(() => {
-    const isDarkMode = document.body.classList.contains('dark');
-    setIsDark(isDarkMode);
-  }, []);
+  const [isDark, setIsDark] = useState(() => {
+    return document.documentElement.classList.contains('dark');
+  });
 
   const toggleTheme = () => {
-    document.body.classList.toggle('dark');
-    setIsDark(!isDark);
+    const newIsDark = !isDark;
+    setIsDark(newIsDark);
+    
+    if (newIsDark) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
   };
 
   return (
@@ -40,13 +45,13 @@ export function Header() {
               variant="ghost"
               size="icon"
               onClick={toggleTheme}
-              className="rounded-full"
+              className="rounded-full hover:bg-primary/10 transition-all duration-300"
+              aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
             >
-              {isDark ? (
-                <Sun className="h-5 w-5" />
-              ) : (
-                <Moon className="h-5 w-5" />
-              )}
+              <div className="relative w-5 h-5">
+                <Sun className={`h-5 w-5 absolute inset-0 transition-all duration-300 ${isDark ? 'opacity-100 rotate-0 scale-100' : 'opacity-0 rotate-90 scale-0'}`} />
+                <Moon className={`h-5 w-5 absolute inset-0 transition-all duration-300 ${isDark ? 'opacity-0 -rotate-90 scale-0' : 'opacity-100 rotate-0 scale-100'}`} />
+              </div>
             </Button>
           </div>
         </div>

@@ -92,12 +92,19 @@ export function AirQualityDisplay({ prediction, isLoading }: AirQualityDisplayPr
             <span className="font-bold">{category}</span>
           </div>
 
-          {/* Confidence */}
-          {confidence && (
-            <p className="mt-4 text-sm text-muted-foreground">
-              Akurasi prediksi: <span className="font-semibold text-foreground">{(confidence * 100).toFixed(0)}%</span>
+          {/* Confidence & Method */}
+          <div className="mt-4 space-y-1">
+            {confidence && (
+              <p className="text-sm text-muted-foreground">
+                Akurasi: <span className="font-semibold text-foreground">{(confidence * 100).toFixed(0)}%</span>
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Metode: <span className="font-medium text-foreground">
+                {prediction.method === 'ml' ? 'Machine Learning (Decision Tree)' : 'Threshold-based (IoT)'}
+              </span>
             </p>
-          )}
+          </div>
 
           {/* Timestamp */}
           <p className="mt-2 text-xs text-muted-foreground">

@@ -74,11 +74,16 @@ export async function fetchOpenAQData(config: OpenAQConfig): Promise<SensorReadi
     const url = `${OPENAQ_BASE_URL}/latest?${params.toString()}`;
     console.log('[OpenAQ Service] Request URL:', url);
 
-    const response = await fetch(url, {
-      headers: {
-        'Accept': 'application/json',
-      },
-    });
+    const headers: Record<string, string> = {
+      'Accept': 'application/json',
+    };
+
+    // Add API key if provided
+    if (config.apiKey) {
+      headers['X-API-Key'] = config.apiKey;
+    }
+
+    const response = await fetch(url, { headers });
 
     if (!response.ok) {
       throw new Error(`OpenAQ API error: ${response.status} ${response.statusText}`);

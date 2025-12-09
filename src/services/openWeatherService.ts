@@ -191,6 +191,7 @@ export async function fetchOpenWeatherData(
 
   let lat: number;
   let lon: number;
+  let locationName: string = '';
 
   // Get coordinates from city name if not provided
   if (config.city) {
@@ -198,10 +199,25 @@ export async function fetchOpenWeatherData(
     const geo = await getCoordinates(config.city, config.apiKey);
     lat = geo.lat;
     lon = geo.lon;
+    locationName = `${geo.name}, ${geo.country}`;
     console.log('[OpenWeather Service] Found coordinates:', lat, lon);
   } else {
     lat = config.lat!;
     lon = config.lon!;
+    // Reverse geocode to get location name
+    try {
+      const reverseUrl = `${GEO_API_BASE}/reverse?lat=${lat}&lon=${lon}&limit=1&appid=${config.apiKey}`;
+      const response = await fetch(reverseUrl);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.length > 0) {
+          locationName = `${data[0].name}, ${data[0].country}`;
+        }
+      }
+    } catch (e) {
+      console.warn('[OpenWeather Service] Reverse geocoding failed:', e);
+      locationName = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+    }
   }
 
   // Fetch weather and air pollution data in parallel
@@ -217,6 +233,7 @@ export async function fetchOpenWeatherData(
     pollutants,
     weather,
     timestamp: new Date(),
-    source: 'openweathermap'
+    source: 'openweathermap',
+    location: locationName
   };
 }
