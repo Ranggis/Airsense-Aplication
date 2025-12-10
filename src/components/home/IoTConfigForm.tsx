@@ -31,7 +31,7 @@ export function IoTConfigForm({ config, onChange }: IoTConfigFormProps) {
         <Input
           id="data-path"
           type="text"
-          placeholder="/sensor/"
+          placeholder="/air_quality"
           value={config.dataPath}
           onChange={(e) => onChange({ ...config, dataPath: e.target.value })}
           className="h-12 rounded-xl bg-background border-border font-mono"

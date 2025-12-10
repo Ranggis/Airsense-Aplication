@@ -23,9 +23,13 @@ export interface PollutantData {
 // IoT sensor data (MQ-135, DHT22, BMP280)
 export interface IoTSensorData {
   gas_index: number;               // MQ-135 - primary parameter for IoT classification
+  mq135_raw: number | null;        // MQ-135 raw analog value (0-4095)
   suhu: number | null;             // DHT22 - temperature (supporting info)
   kelembapan: number | null;       // DHT22 - humidity (supporting info)
   tekanan: number | null;          // BMP280 - pressure (supporting info)
+  category?: string;               // Category from ESP32 classification
+  timestamp?: number;              // Firebase server timestamp
+  local_time_s?: number;           // Local time in seconds since ESP32 boot
 }
 
 // Weather data (optional, from OpenWeatherMap)

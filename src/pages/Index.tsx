@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Loader2, RefreshCw, MapPin, Wind, TrendingUp, Activity, BarChart3, Radar, Calendar, Bell, BellOff, Play, Pause } from 'lucide-react';
+import { Loader2, RefreshCw, MapPin, Wind, TrendingUp, Activity, BarChart3, Radar, Calendar, Bell, BellOff, Play, Pause, Wifi, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -30,7 +30,7 @@ import {
   PredictionResult,
   AirQualityCategory 
 } from '@/types/airQuality';
-import { fetchFirebaseData } from '@/services/firebaseService';
+import { fetchFirebaseData, subscribeToFirebaseData } from '@/services/firebaseService';
 import { fetchOpenWeatherData } from '@/services/openWeatherService';
 import { fetchOpenAQData } from '@/services/openAQService';
 import { predictAirQuality } from '@/services/predictionService';
@@ -67,8 +67,9 @@ export default function Index() {
   // Config states
   const [iotConfig, setIoTConfig] = useState<IoTConfig>({
     firebaseUrl: '',
-    dataPath: '/sensor/',
+    dataPath: '/air_quality',
   });
+  const [iotRealtimeEnabled, setIotRealtimeEnabled] = useState(false);
   const [owmConfig, setOwmConfig] = useState<OpenWeatherConfig>({
     apiKey: '',
     city: 'Jakarta',
@@ -196,6 +197,62 @@ export default function Index() {
     return () => clearInterval(timer);
   }, [autoRefreshEnabled]);
 
+  // Real-time IoT subscription
+  useEffect(() => {
+    if (dataSource !== 'iot' || !iotRealtimeEnabled || !iotConfig.firebaseUrl) {
+      return;
+    }
+
+    console.log('[Index] Starting IoT real-time subscription');
+    
+    const unsubscribe = subscribeToFirebaseData(
+      iotConfig,
+      (data) => {
+        console.log('[Index] Real-time IoT data received');
+        
+        // Classify the data
+        if (data.iotData) {
+          const result = classifyIoTAirQuality(data.iotData);
+          
+          // Update results
+          setResults(prev => ({
+            ...prev,
+            iot: { sensorData: data, prediction: result }
+          }));
+
+          // Check for category change and notify
+          if (previousCategory.current !== result.category) {
+            notify(previousCategory.current, result.category);
+            
+            // Send Telegram alert on category change if enabled
+            if (telegramEnabled) {
+              sendTelegramAlert(
+                result.category,
+                previousCategory.current,
+                'IoT Sensor',
+                data.pollutants,
+                'iot'
+              ).catch(err => console.error('[Index] Telegram error:', err));
+            }
+            
+            previousCategory.current = result.category;
+          }
+        }
+      },
+      (error) => {
+        console.error('[Index] IoT subscription error:', error);
+        toast.error('Koneksi real-time gagal', {
+          description: error.message
+        });
+      }
+    );
+
+    return () => {
+      console.log('[Index] Stopping IoT real-time subscription');
+      unsubscribe();
+    };
+  }, [dataSource, iotRealtimeEnabled, iotConfig, telegramEnabled, notify]);
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
@@ -285,7 +342,33 @@ export default function Index() {
                   </div>
 
                   {dataSource === 'iot' && (
-                    <IoTConfigForm config={iotConfig} onChange={setIoTConfig} />
+                    <div className="space-y-4">
+                      <IoTConfigForm config={iotConfig} onChange={setIoTConfig} />
+                      
+                      {/* Real-time toggle for IoT */}
+                      <div className="flex items-center justify-between p-4 rounded-xl bg-muted/50 border border-border">
+                        <div className="flex items-center gap-3">
+                          {iotRealtimeEnabled ? (
+                            <Wifi className="h-5 w-5 text-primary animate-pulse" />
+                          ) : (
+                            <WifiOff className="h-5 w-5 text-muted-foreground" />
+                          )}
+                          <div>
+                            <p className="font-medium text-sm">Real-time Updates</p>
+                            <p className="text-xs text-muted-foreground">
+                              {iotRealtimeEnabled 
+                                ? 'Data diperbarui setiap 5 detik dari Firebase' 
+                                : 'Klik Analisis untuk mengambil data'}
+                            </p>
+                          </div>
+                        </div>
+                        <Switch
+                          checked={iotRealtimeEnabled}
+                          onCheckedChange={setIotRealtimeEnabled}
+                          disabled={!iotConfig.firebaseUrl}
+                        />
+                      </div>
+                    </div>
                   )}
                   {dataSource === 'openweathermap' && (
                     <OpenWeatherConfigForm config={owmConfig} onChange={setOwmConfig} />

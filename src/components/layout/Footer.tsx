@@ -1,3 +1,4 @@
+
 import { Coffee } from "lucide-react";
 
 export function Footer() {

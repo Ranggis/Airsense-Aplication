@@ -4,33 +4,46 @@
  * This service handles fetching sensor data from Firebase Realtime Database.
  * IoT mode uses MQ-135 (gas_index), DHT22 (temp/humidity), BMP280 (pressure)
  * 
- * Expected Firebase data structure:
+ * Expected Firebase data structure (pushed to /air_quality):
  * {
- *   "sensor": {
- *     "gas_index": 150,      // MQ-135 sensor value
- *     "suhu": 28.5,          // DHT22 temperature
- *     "kelembapan": 65,      // DHT22 humidity
- *     "tekanan": 1013.25     // BMP280 pressure
- *   }
+ *   "mq135_raw": 503,
+ *   "gas_index": 61.41,
+ *   "temperature": 29.3,
+ *   "humidity": 75.6,
+ *   "pressure": 989.83,
+ *   "category": "BAIK",
+ *   "local_time_s": 16,
+ *   "timestamp": 1765386610449
  * }
  */
 
 import { IoTConfig, SensorReading, IoTSensorData } from '@/types/airQuality';
 
+interface FirebaseEntry {
+  gas_index: number;
+  mq135_raw: number;
+  temperature: number;
+  humidity: number;
+  pressure: number;
+  category: string;
+  local_time_s?: number;
+  timestamp?: number;
+}
+
 /**
- * Fetch sensor data from Firebase Realtime Database
+ * Fetch the latest sensor data from Firebase Realtime Database
  * 
  * @param config - Firebase configuration with URL and data path
- * @returns SensorReading with IoT sensor data (gas_index, temp, humidity, pressure)
+ * @returns SensorReading with IoT sensor data
  */
 export async function fetchFirebaseData(config: IoTConfig): Promise<SensorReading> {
   // Validate configuration
-  if (!config.firebaseUrl || !config.dataPath) {
-    throw new Error('Firebase URL dan path data harus diisi');
+  if (!config.firebaseUrl) {
+    throw new Error('Firebase URL harus diisi');
   }
 
   try {
-    // Build the Firebase REST API URL
+    // Fetch from /air_quality path (history data pushed by ESP32)
     const url = `${config.firebaseUrl}${config.dataPath}.json`;
     console.log('[Firebase Service] Fetching from:', url);
 
@@ -46,18 +59,49 @@ export async function fetchFirebaseData(config: IoTConfig): Promise<SensorReadin
       throw new Error('Data tidak ditemukan di Firebase');
     }
 
+    // Data from Firebase is an object with push keys, get the latest entry
+    let latestEntry: FirebaseEntry | null = null;
+    let latestTimestamp = 0;
+
+    // Handle both single object and pushed history object
+    if (typeof data === 'object' && !Array.isArray(data)) {
+      // Check if it's a direct sensor reading or pushed history
+      if ('gas_index' in data) {
+        // Direct sensor reading format
+        latestEntry = data as FirebaseEntry;
+      } else {
+        // Pushed history format - find latest by timestamp
+        for (const key of Object.keys(data)) {
+          const entry = data[key] as FirebaseEntry;
+          const entryTimestamp = entry.timestamp || 0;
+          if (entryTimestamp > latestTimestamp) {
+            latestTimestamp = entryTimestamp;
+            latestEntry = entry;
+          }
+        }
+      }
+    }
+
+    if (!latestEntry) {
+      throw new Error('Format data Firebase tidak valid');
+    }
+
+    console.log('[Firebase Service] Latest entry:', latestEntry);
+
     // Parse IoT sensor data
     const iotData: IoTSensorData = {
-      gas_index: parseFloat(data.gas_index) || 0,
-      suhu: data.suhu !== undefined ? parseFloat(data.suhu) : null,
-      kelembapan: data.kelembapan !== undefined ? parseFloat(data.kelembapan) : null,
-      tekanan: data.tekanan !== undefined ? parseFloat(data.tekanan) : null,
+      gas_index: parseFloat(String(latestEntry.gas_index)) || 0,
+      mq135_raw: latestEntry.mq135_raw !== undefined ? parseFloat(String(latestEntry.mq135_raw)) : null,
+      suhu: latestEntry.temperature !== undefined ? parseFloat(String(latestEntry.temperature)) : null,
+      kelembapan: latestEntry.humidity !== undefined ? parseFloat(String(latestEntry.humidity)) : null,
+      tekanan: latestEntry.pressure !== undefined ? parseFloat(String(latestEntry.pressure)) : null,
+      category: latestEntry.category,
+      timestamp: latestEntry.timestamp,
+      local_time_s: latestEntry.local_time_s,
     };
 
     console.log('[Firebase Service] IoT Data received:', iotData);
 
-    // For IoT mode, pollutants are not used (ML not called)
-    // We still populate with nulls for interface compatibility
     return {
       pollutants: {
         pm_sepuluh: null,
@@ -74,7 +118,7 @@ export async function fetchFirebaseData(config: IoTConfig): Promise<SensorReadin
         tekanan: iotData.tekanan,
         kondisi: null,
       },
-      timestamp: new Date(),
+      timestamp: latestEntry.timestamp ? new Date(latestEntry.timestamp) : new Date(),
       source: 'iot',
       location: 'IoT Sensor'
     };
@@ -85,25 +129,45 @@ export async function fetchFirebaseData(config: IoTConfig): Promise<SensorReadin
 }
 
 /**
- * Subscribe to real-time updates from Firebase
+ * Subscribe to real-time updates from Firebase using polling
+ * Firebase REST API doesn't support true WebSocket streaming without SDK
+ * So we poll every 5 seconds for near real-time updates
  */
 export function subscribeToFirebaseData(
   config: IoTConfig,
-  callback: (data: SensorReading) => void
+  callback: (data: SensorReading) => void,
+  onError?: (error: Error) => void
 ): () => void {
-  console.log('[Firebase Service] Starting subscription to:', config.dataPath);
+  console.log('[Firebase Service] Starting real-time subscription');
   
-  const intervalId = setInterval(async () => {
+  let isActive = true;
+  const POLL_INTERVAL = 5000; // Poll every 5 seconds for real-time feel
+
+  const poll = async () => {
+    if (!isActive) return;
+    
     try {
       const data = await fetchFirebaseData(config);
-      callback(data);
+      if (isActive) {
+        callback(data);
+      }
     } catch (error) {
       console.error('[Firebase Service] Subscription error:', error);
+      if (onError && error instanceof Error) {
+        onError(error);
+      }
     }
-  }, 30000); // Update every 30 seconds
+    
+    if (isActive) {
+      setTimeout(poll, POLL_INTERVAL);
+    }
+  };
+
+  // Start polling
+  poll();
 
   return () => {
-    console.log('[Firebase Service] Unsubscribing from:', config.dataPath);
-    clearInterval(intervalId);
+    console.log('[Firebase Service] Stopping real-time subscription');
+    isActive = false;
   };
 }
